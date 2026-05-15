@@ -62,6 +62,14 @@ app.use(['/login', '/register'], authLimiter);
 
 app.use(express.json({ limit: '10kb' }));
 
+// Catch malformed JSON bodies and return a clear 400 instead of a 500
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON in request body' });
+  }
+  next(err);
+});
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 app.use('/', authRoutes);

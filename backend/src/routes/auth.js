@@ -10,28 +10,39 @@ const router = Router();
 
 const registerRules = [
   body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
     .isEmail().withMessage('A valid email is required')
-    .normalizeEmail()
-    .isLength({ max: 255 }).withMessage('Email too long'),
+    .isLength({ max: 255 }).withMessage('Email too long')
+    .customSanitizer((val) => val.toLowerCase()),   // simple lowercase, no normalizeEmail
   body('password')
+    .notEmpty().withMessage('Password is required')
     .isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
     .isLength({ max: 128 }).withMessage('Password too long'),
   body('name')
-    .optional({ checkFalsy: true })   // treats "", null, undefined all as "not provided"
+    .optional({ checkFalsy: true })  // empty string / null / undefined → skip validation
     .trim()
     .isLength({ min: 1, max: 100 }).withMessage('Name must be 1–100 characters')
     .escape(),
 ];
 
 const loginRules = [
-  body('email').isEmail().withMessage('A valid email is required').normalizeEmail(),
-  body('password').notEmpty().withMessage('Password is required'),
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('A valid email is required')
+    .customSanitizer((val) => val.toLowerCase()),
+  body('password')
+    .notEmpty().withMessage('Password is required'),
 ];
 
-// Returns true if there were validation errors (response already sent)
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 const handleValidation = (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    // Log to Render so we can see exactly which field fails
+    console.error('[Validation 400]', JSON.stringify(errors.array()));
     res.status(400).json({ errors: errors.array() });
     return true;
   }
@@ -41,6 +52,13 @@ const handleValidation = (req, res) => {
 // ─── POST /register ───────────────────────────────────────────────────────────
 
 router.post('/register', registerRules, async (req, res) => {
+  // Log incoming body (mask password) to debug on Render
+  console.log('[Register] body:', {
+    email: req.body?.email,
+    name: req.body?.name,
+    hasPassword: Boolean(req.body?.password),
+  });
+
   if (handleValidation(req, res)) return;
 
   const { email, password, name } = req.body;
@@ -51,9 +69,8 @@ router.post('/register', registerRules, async (req, res) => {
       return res.status(409).json({ error: 'Email is already registered' });
     }
 
-    // bcrypt cost 12: ~250ms per hash — strong enough against brute force
     const hashed = await bcrypt.hash(password, 12);
-    await User.create({ email, password: hashed, name: name ?? null });
+    await User.create({ email, password: hashed, name: name || null });
 
     return res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
@@ -65,20 +82,20 @@ router.post('/register', registerRules, async (req, res) => {
 // ─── POST /login ──────────────────────────────────────────────────────────────
 
 router.post('/login', loginRules, async (req, res) => {
+  console.log('[Login] email:', req.body?.email);
+
   if (handleValidation(req, res)) return;
 
   const { email, password } = req.body;
 
   try {
-    // .select('+password') overrides schema-level { select: false }
     const user = await User.findOne({ email }).select('+password');
 
-    // Always call bcrypt.compare even when user is not found.
-    // This prevents timing-based user enumeration attacks.
-    const DUMMY_HASH = '$2a$12$invalidhashplaceholdertopreventtimingattacks000000000';
+    // Always run compare even for missing user — prevents timing attacks
+    const DUMMY = '$2a$12$invalidhashplaceholdertopreventtimingattacks000000000';
     const isMatch = user
       ? await bcrypt.compare(password, user.password)
-      : await bcrypt.compare(password, DUMMY_HASH);
+      : await bcrypt.compare(password, DUMMY);
 
     if (!user || !isMatch) {
       return res.status(401).json({ message: 'Invalid email or password' });
