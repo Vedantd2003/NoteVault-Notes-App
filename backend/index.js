@@ -23,13 +23,20 @@ app.use(helmet());
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+
     const allowed = [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
+      process.env.FRONTEND_URL,
       'http://localhost:5173',
       'http://localhost:3000',
-    ];
-    if (!origin || allowed.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
+    ].filter(Boolean);
+
+    // Allow any *.onrender.com subdomain so the Render static site always works
+    const isRender = origin.endsWith('.onrender.com');
+
+    if (isRender || allowed.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

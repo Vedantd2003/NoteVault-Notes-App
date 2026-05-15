@@ -17,7 +17,7 @@ const registerRules = [
     .isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
     .isLength({ max: 128 }).withMessage('Password too long'),
   body('name')
-    .optional()
+    .optional({ checkFalsy: true })   // treats "", null, undefined all as "not provided"
     .trim()
     .isLength({ min: 1, max: 100 }).withMessage('Name must be 1–100 characters')
     .escape(),

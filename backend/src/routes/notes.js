@@ -64,7 +64,7 @@ const noteBodyRules = [
     .isIn(VALID_COLORS)
     .withMessage(`color must be one of: ${VALID_COLORS.join(', ')}`),
   body('tag')
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .trim()
     .isLength({ max: 50 }).withMessage('Tag too long (max 50 chars)')
     .escape(),
