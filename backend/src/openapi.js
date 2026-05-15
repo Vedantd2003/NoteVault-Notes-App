@@ -12,7 +12,7 @@ const spec = {
   },
   servers: [
     { url: 'http://localhost:3001', description: 'Local development' },
-    { url: 'https://your-app.onrender.com', description: 'Production' },
+    { url: 'https://notevault-api.onrender.com', description: 'Production (Render)' },
   ],
   components: {
     securitySchemes: {
