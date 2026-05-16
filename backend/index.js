@@ -137,7 +137,7 @@ app.get('/about', (_req, res) => {
 
 // GET /health
 app.get('/health', (_req, res) =>
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({ status: 'ok', version: 'v4-debug', timestamp: new Date().toISOString() })
 );
 
 // ─── 404 + global error handler ──────────────────────────────────────────────

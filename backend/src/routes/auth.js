@@ -9,42 +9,44 @@ const router = Router();
 
 router.post('/register', async (req, res) => {
   try {
-    // Log everything so Render logs show exactly what arrives
-    console.log('[Register] content-type:', req.headers['content-type']);
-    console.log('[Register] body:', JSON.stringify(req.body));
-
     const body = req.body;
+    const ct   = req.headers['content-type'] || 'missing';
 
-    if (!body || typeof body !== 'object') {
-      return res.status(400).json({ error: 'Request body must be valid JSON' });
+    // Debug info returned in every 400 so you can see it in browser Network tab
+    const debug = {
+      contentType: ct,
+      bodyType: typeof body,
+      bodyReceived: body,
+    };
+
+    console.log('[Register]', JSON.stringify(debug));
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return res.status(400).json({
+        error: 'Body not parsed — Content-Type must be application/json',
+        debug,
+      });
     }
 
     const { email, password, name } = body;
 
-    // Manual validation — no library, no edge cases
     if (!email || typeof email !== 'string' || !email.trim()) {
-      return res.status(400).json({ error: 'Email is required' });
+      return res.status(400).json({ error: 'Email is required', debug });
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      return res.status(400).json({ error: 'A valid email is required' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'A valid email is required', debug });
     }
-    if (email.trim().length > 255) {
-      return res.status(400).json({ error: 'Email too long' });
+    if (email.length > 255) {
+      return res.status(400).json({ error: 'Email too long', debug });
     }
-
     if (!password || typeof password !== 'string') {
-      return res.status(400).json({ error: 'Password is required' });
+      return res.status(400).json({ error: 'Password is required', debug });
     }
     if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      return res.status(400).json({ error: 'Password must be at least 6 characters', debug });
     }
     if (password.length > 128) {
-      return res.status(400).json({ error: 'Password too long' });
-    }
-
-    if (name !== undefined && name !== null && name !== '' && typeof name === 'string' && name.trim().length > 100) {
-      return res.status(400).json({ error: 'Name too long (max 100 characters)' });
+      return res.status(400).json({ error: 'Password too long', debug });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -58,12 +60,12 @@ router.post('/register', async (req, res) => {
     await User.create({
       email: normalizedEmail,
       password: hashed,
-      name: (name && name.trim()) || null,
+      name: (name && typeof name === 'string' && name.trim()) || null,
     });
 
     return res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    console.error('[Register] error:', err);
+    console.error('[Register] server error:', err);
     return res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -72,13 +74,11 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    console.log('[Login] content-type:', req.headers['content-type']);
-    console.log('[Login] body:', JSON.stringify({ email: req.body?.email, hasPassword: Boolean(req.body?.password) }));
-
     const body = req.body;
+    console.log('[Login] body:', JSON.stringify({ email: body?.email, hasPassword: Boolean(body?.password) }));
 
     if (!body || typeof body !== 'object') {
-      return res.status(400).json({ error: 'Request body must be valid JSON' });
+      return res.status(400).json({ error: 'Body not parsed — Content-Type must be application/json' });
     }
 
     const { email, password } = body;
@@ -91,10 +91,8 @@ router.post('/login', async (req, res) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-
     const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
-    // Always run bcrypt even when user not found — prevents timing attacks
     const DUMMY = '$2a$12$invalidhashplaceholdertopreventtimingattacks000000000';
     const isMatch = user
       ? await bcrypt.compare(password, user.password)
@@ -115,7 +113,7 @@ router.post('/login', async (req, res) => {
       user: { id: user._id.toString(), email: user.email, name: user.name },
     });
   } catch (err) {
-    console.error('[Login] error:', err);
+    console.error('[Login] server error:', err);
     return res.status(500).json({ error: 'Login failed' });
   }
 });
